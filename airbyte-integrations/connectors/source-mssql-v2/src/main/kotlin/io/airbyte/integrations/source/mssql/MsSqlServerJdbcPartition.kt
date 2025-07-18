@@ -259,12 +259,26 @@ sealed class MsSqlServerJdbcCursorPartition(
     checkpointColumns: List<Field>,
     val cursor: Field,
     private val explicitCursorUpperBound: JsonNode?,
+    val cursorCutoffTime: JsonNode? = null,
 ) :
     MsSqlServerJdbcResumablePartition(selectQueryGenerator, streamState, checkpointColumns),
     JdbcCursorPartition<DefaultJdbcStreamState> {
 
     val cursorUpperBound: JsonNode
-        get() = explicitCursorUpperBound ?: streamState.cursorUpperBound!!
+        get() {
+            val upperBound = explicitCursorUpperBound ?: streamState.cursorUpperBound!!
+            // If we have a cutoff time and it's less than the upper bound, use the cutoff
+            return if (cursorCutoffTime != null && isLessThan(cursorCutoffTime, upperBound)) {
+                cursorCutoffTime
+            } else {
+                upperBound
+            }
+        }
+
+    private fun isLessThan(a: JsonNode, b: JsonNode): Boolean {
+        // Simple string comparison works for ISO-formatted dates/timestamps
+        return a.asText() < b.asText()
+    }
 
     override val cursorUpperBoundQuery: SelectQuery
         get() = selectQueryGenerator.generate(cursorUpperBoundQuerySpec.optimize())
@@ -283,13 +297,15 @@ class MsSqlServerJdbcSnapshotWithCursorPartition(
     override val lowerBound: List<JsonNode>?,
     cursor: Field,
     cursorUpperBound: JsonNode?,
+    cursorCutoffTime: JsonNode? = null,
 ) :
     MsSqlServerJdbcCursorPartition(
         selectQueryGenerator,
         streamState,
         primaryKey,
         cursor,
-        cursorUpperBound
+        cursorUpperBound,
+        cursorCutoffTime
     ) {
     // UpperBound is not used because the partition is not splittable.
     override val upperBound: List<JsonNode>? = null
@@ -322,13 +338,15 @@ class MsSqlServerJdbcCursorIncrementalPartition(
     val cursorLowerBound: JsonNode,
     override val isLowerBoundIncluded: Boolean,
     cursorUpperBound: JsonNode?,
+    cursorCutoffTime: JsonNode? = null,
 ) :
     MsSqlServerJdbcCursorPartition(
         selectQueryGenerator,
         streamState,
         listOf(cursor),
         cursor,
-        cursorUpperBound
+        cursorUpperBound,
+        cursorCutoffTime
     ) {
     override val lowerBound: List<JsonNode> = listOf(cursorLowerBound)
     override val upperBound: List<JsonNode>

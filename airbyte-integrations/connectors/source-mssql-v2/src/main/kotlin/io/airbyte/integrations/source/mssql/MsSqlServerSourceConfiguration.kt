@@ -30,11 +30,13 @@ class MsSqlServerSourceConfiguration(
     override val maxConcurrency: Int,
     override val resourceAcquisitionHeartbeat: Duration = Duration.ofMillis(100L),
     override val checkpointTargetInterval: Duration,
-    //    override val debeziumHeartbeatInterval: Duration = Duration.ofSeconds(10),
+    override val debeziumHeartbeatInterval: Duration = Duration.ofSeconds(10),
     val incrementalReplicationConfiguration: IncrementalConfiguration,
-) : JdbcSourceConfiguration {
-    override val global = false
-    override val maxSnapshotReadDuration: Duration? = null
+    val databaseName: String,
+) : JdbcSourceConfiguration, CdcSourceConfiguration {
+    override val global = incrementalReplicationConfiguration is CdcIncrementalConfiguration
+    override val maxSnapshotReadDuration: Duration? =
+        (incrementalReplicationConfiguration as? CdcIncrementalConfiguration)?.initialLoadTimeout
 
     /** Required to inject [MsSqlServerSourceConfiguration] directly. */
     @Factory
@@ -52,19 +54,20 @@ class MsSqlServerSourceConfiguration(
 
 sealed interface IncrementalConfiguration
 
-data object UserDefinedCursorIncrementalConfiguration : IncrementalConfiguration
+data class UserDefinedCursorIncrementalConfiguration(val excludeTodaysData: Boolean = false) :
+    IncrementalConfiguration
 
-// data class CdcIncrementalConfiguration(
-//    val initialWaitingSeconds: Duration,
-//    val queueSize: Int,
-//    val invalidCdcCursorPositionBehavior: InvalidCdcCursorPositionBehavior,
-//    val initialLoadTimeout: Duration
-// ) : IncrementalConfiguration
-//
-// enum class InvalidCdcCursorPositionBehavior {
-//    FAIL_SYNC,
-//    RESET_SYNC,
-// }
+data class CdcIncrementalConfiguration(
+    val initialWaitingSeconds: Duration,
+    val queueSize: Int,
+    val invalidCdcCursorPositionBehavior: InvalidCdcCursorPositionBehavior,
+    val initialLoadTimeout: Duration
+) : IncrementalConfiguration
+
+enum class InvalidCdcCursorPositionBehavior {
+    FAIL_SYNC,
+    RESET_SYNC,
+}
 
 @Singleton
 class MsSqlServerSourceConfigurationFactory
@@ -81,34 +84,30 @@ constructor(val featureFlags: Set<FeatureFlag>) :
         val incrementalSpec = pojo.getIncrementalValue()
         val incrementalReplicationConfiguration =
             when (incrementalSpec) {
-                UserDefinedCursor -> UserDefinedCursorIncrementalConfiguration
-                else ->
-                    throw ConfigErrorException(
-                        "Incremental configuration is not supported for MSSQL source"
+                is UserDefinedCursor -> {
+                    UserDefinedCursorIncrementalConfiguration(
+                        excludeTodaysData = incrementalSpec.excludeTodaysData ?: false
                     )
-            //                is Cdc -> {
-            //                    val initialWaitingSeconds: Duration =
-            //
-            // Duration.ofSeconds(incrementalSpec.initialWaitingSeconds!!.toLong())
-            //                    val initialLoadTimeout: Duration =
-            //
-            // Duration.ofHours(incrementalSpec.initialLoadTimeoutHours!!.toLong())
-            //                    val queueSize = incrementalSpec.queueSize!!
-            //                    val invalidCdcCursorPositionBehavior:
-            // InvalidCdcCursorPositionBehavior =
-            //                        if (incrementalSpec.invalidCdcCursorPositionBehavior == "Fail
-            // sync") {
-            //                            InvalidCdcCursorPositionBehavior.FAIL_SYNC
-            //                        } else {
-            //                            InvalidCdcCursorPositionBehavior.RESET_SYNC
-            //                        }
-            //                    CdcIncrementalConfiguration(
-            //                        initialWaitingSeconds,
-            //                        queueSize,
-            //                        invalidCdcCursorPositionBehavior,
-            //                        initialLoadTimeout,
-            //                    )
-            //                }
+                }
+                is Cdc -> {
+                    val initialWaitingSeconds: Duration =
+                        Duration.ofSeconds(incrementalSpec.initialWaitingSeconds?.toLong() ?: 300L)
+                    val initialLoadTimeout: Duration =
+                        Duration.ofHours(incrementalSpec.initialLoadTimeoutHours?.toLong() ?: 8L)
+                    val queueSize = incrementalSpec.queueSize ?: 10000
+                    val invalidCdcCursorPositionBehavior: InvalidCdcCursorPositionBehavior =
+                        if (incrementalSpec.invalidCdcCursorPositionBehavior == "Fail sync") {
+                            InvalidCdcCursorPositionBehavior.FAIL_SYNC
+                        } else {
+                            InvalidCdcCursorPositionBehavior.RESET_SYNC
+                        }
+                    CdcIncrementalConfiguration(
+                        initialWaitingSeconds,
+                        queueSize,
+                        invalidCdcCursorPositionBehavior,
+                        initialLoadTimeout,
+                    )
+                }
             }
 
         val sshTunnel: SshTunnelMethodConfiguration? = pojo.getTunnelMethodValue()
@@ -173,9 +172,10 @@ constructor(val featureFlags: Set<FeatureFlag>) :
                     )
                     .plus(jdbcEncryption),
             maxConcurrency = 10,
-            //            debeziumHeartbeatInterval = Duration.ofSeconds(15),
+            debeziumHeartbeatInterval = Duration.ofSeconds(15),
             resourceAcquisitionHeartbeat = Duration.ofSeconds(15),
-            incrementalReplicationConfiguration = incrementalReplicationConfiguration
+            incrementalReplicationConfiguration = incrementalReplicationConfiguration,
+            databaseName = pojo.database
         )
     }
 }

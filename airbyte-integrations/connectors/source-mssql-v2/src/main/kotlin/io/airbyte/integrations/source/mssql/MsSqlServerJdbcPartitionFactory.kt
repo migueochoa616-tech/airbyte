@@ -101,18 +101,20 @@ class MsSqlServerJdbcPartitionFactory(
             )
         }
 
-        // Disable CDC for now
-        // if (sharedState.configuration.global) {
-        //     return MsSqlServerJdbcCdcSnapshotPartition(
-        //         selectQueryGenerator,
-        //         streamState,
-        //         pkChosenFromCatalog,
-        //         lowerBound = null,
-        //     )
-        // }
+        if (sharedState.configuration.global) {
+            return MsSqlServerJdbcCdcSnapshotPartition(
+                selectQueryGenerator,
+                streamState,
+                pkChosenFromCatalog,
+                lowerBound = null,
+            )
+        }
 
         val cursorChosenFromCatalog: Field =
             stream.configuredCursor as? Field ?: throw ConfigErrorException("no cursor")
+
+        // Calculate cutoff time for cursor if exclude today's data is enabled
+        val cursorCutoffTime = getCursorCutoffTime(cursorChosenFromCatalog)
 
         if (pkChosenFromCatalog.isEmpty()) {
             return MsSqlServerJdbcNonResumableSnapshotWithCursorPartition(
@@ -128,6 +130,7 @@ class MsSqlServerJdbcPartitionFactory(
             lowerBound = null,
             cursorChosenFromCatalog,
             cursorUpperBound = null,
+            cursorCutoffTime = cursorCutoffTime,
         )
     }
 
@@ -238,6 +241,7 @@ class MsSqlServerJdbcPartitionFactory(
                     lowerBound = listOf(pkLowerBound),
                     cursorChosenFromCatalog,
                     cursorUpperBound = null,
+                    cursorCutoffTime = getCursorCutoffTime(cursorChosenFromCatalog),
                 )
             }
         } else {
@@ -279,6 +283,7 @@ class MsSqlServerJdbcPartitionFactory(
                     lowerBound = listOf(pkLowerBound),
                     cursorChosenFromCatalog,
                     cursorUpperBound = null,
+                    cursorCutoffTime = getCursorCutoffTime(cursorChosenFromCatalog),
                 )
             }
             // resume back to cursor based increment.
@@ -298,6 +303,7 @@ class MsSqlServerJdbcPartitionFactory(
                 cursorLowerBound = cursorCheckpoint,
                 isLowerBoundIncluded = false,
                 cursorUpperBound = streamState.cursorUpperBound,
+                cursorCutoffTime = getCursorCutoffTime(cursor),
             )
         }
     }
@@ -349,6 +355,18 @@ class MsSqlServerJdbcPartitionFactory(
                 throw IllegalStateException(
                     "PK field must be leaf type but is ${field.type.airbyteSchemaType}."
                 )
+        }
+    }
+
+    private fun getCursorCutoffTime(cursorField: Field): JsonNode? {
+        val incrementalConfig = config.incrementalReplicationConfiguration
+        return if (
+            incrementalConfig is UserDefinedCursorIncrementalConfiguration &&
+                incrementalConfig.excludeTodaysData
+        ) {
+            MsSqlServerCursorCutoffTimeProvider.getCutoffTime(cursorField, true)
+        } else {
+            null
         }
     }
 

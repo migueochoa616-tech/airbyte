@@ -275,7 +275,16 @@ sealed interface IncrementalConfigurationSpecification
         "#user-defined-cursor\">cursor column</a> chosen when configuring a connection " +
         "(e.g. created_at, updated_at).",
 )
-data object UserDefinedCursor : IncrementalConfigurationSpecification
+class UserDefinedCursor : IncrementalConfigurationSpecification {
+    @JsonProperty("exclude_todays_data")
+    @JsonSchemaTitle("Exclude Today's Data")
+    @JsonPropertyDescription(
+        "When enabled incremental syncs using a cursor of a temporal types (date or datetime) will include cursor values only up until last midnight"
+    )
+    @JsonSchemaDefault("false")
+    @JsonSchemaInject(json = """{"order":1,"always_show":true}""")
+    var excludeTodaysData: Boolean? = false
+}
 
 @JsonSchemaTitle("Read Changes using Change Data Capture (CDC)")
 @JsonSchemaDescription(
@@ -329,7 +338,7 @@ class MicronautPropertiesFriendlyIncrementalConfigurationSpecification {
 
     fun asCursorMethodConfiguration(): IncrementalConfigurationSpecification =
         when (method) {
-            "STANDARD" -> UserDefinedCursor
+            "STANDARD" -> UserDefinedCursor()
             "CDC" -> Cdc()
             else -> throw ConfigErrorException("invalid value $method")
         }
