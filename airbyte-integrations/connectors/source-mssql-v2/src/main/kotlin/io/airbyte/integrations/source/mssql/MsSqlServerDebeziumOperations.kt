@@ -11,6 +11,7 @@ import io.airbyte.cdk.read.cdc.AbortDebeziumWarmStartState
 import io.airbyte.cdk.read.cdc.CdcPartitionReaderDebeziumOperations
 import io.airbyte.cdk.read.cdc.CdcPartitionsCreatorDebeziumOperations
 import io.airbyte.cdk.read.cdc.DebeziumOffset
+import io.airbyte.cdk.read.cdc.DebeziumPropertiesBuilder
 import io.airbyte.cdk.read.cdc.DebeziumRecordKey
 import io.airbyte.cdk.read.cdc.DebeziumRecordValue
 import io.airbyte.cdk.read.cdc.DebeziumSchemaHistory
@@ -250,36 +251,83 @@ class MsSqlServerDebeziumOperations(private val configuration: MsSqlServerSource
 
     override fun generateColdStartProperties(streams: List<Stream>): Map<String, String> {
         val databaseName = configuration.databaseName
-        return mapOf(
-            "name" to databaseName,
-            "topic.prefix" to databaseName,
-            "connector.class" to SqlServerConnector::class.java.name,
-            "include.schema.changes" to "false",
-            "provide.transaction.metadata" to "false",
-            "binary.handling.mode" to "base64",
-            "snapshot.mode" to "initial",
-            "snapshot.locking.mode" to "none",
-            "database.hostname" to configuration.realHost,
-            "database.port" to configuration.realPort.toString(),
-            "database.user" to configuration.jdbcProperties["user"].toString(),
-            "database.password" to configuration.jdbcProperties["password"].toString(),
-            "database.dbname" to databaseName,
-            "database.names" to databaseName,
-            "database.encrypt" to (configuration.jdbcProperties["encrypt"]!!),
-            "database.trustServerCertificate" to
-                (configuration.jdbcProperties["trustServerCertificate"]!!),
-            // Offset storage configuration
-            "offset.storage" to "org.apache.kafka.connect.storage.FileOffsetBackingStore",
-            "offset.storage.file.filename" to "/tmp/debezium-mssql-offsets-${databaseName}.dat",
-            "offset.flush.interval.ms" to "60000",
+
+        // Build schema list from streams (similar to old connector)
+        val schemaList = streams.map { it.namespace }.distinct().joinToString(",")
+
+        return DebeziumPropertiesBuilder()
+            .withDefault()
+            .withConnector(SqlServerConnector::class.java)
+            .withDebeziumName(databaseName)
+            .withHeartbeats(configuration.debeziumHeartbeatInterval)
+            .withOffset()
+            .withSchemaHistory()
+            // Add required Kafka properties for schema history (even though using
+            // FileSchemaHistory)
+            .with("schema.history.internal.kafka.topic", "dbhistory.$databaseName")
+            .with("schema.history.internal.kafka.bootstrap.servers", "unused")
+            .with("include.schema.changes", "false")
+            .with("provide.transaction.metadata", "false")
+            // Use initial_only for cold start (schema history will be built automatically)
+            .with("snapshot.mode", "initial_only")
+            .with("snapshot.isolation.mode", "read_committed")
+            // Schema configuration like old connector
+            .with("schema.include.list", schemaList)
+            .withDatabase("hostname", configuration.realHost)
+            .withDatabase("port", configuration.realPort.toString())
+            .withDatabase("user", configuration.jdbcProperties["user"].toString())
+            .withDatabase("password", configuration.jdbcProperties["password"].toString())
+            .withDatabase("dbname", databaseName)
+            .withDatabase("names", databaseName)
+            // Replicate old connector's SSL property names
+            .with("database.encrypt", configuration.jdbcProperties["encrypt"] ?: "false")
+            .with(
+                "driver.trustServerCertificate",
+                configuration.jdbcProperties["trustServerCertificate"] ?: "true"
+            )
             // Register the MSSQL custom converter
-            "converters" to "mssql",
-            "mssql.type" to MsSqlServerDebeziumConverter::class.java.name
-        )
+            .with("converters", "mssql_converter")
+            .with("mssql_converter.type", MsSqlServerDebeziumConverter::class.java.name)
+            .buildMap()
     }
 
     override fun generateWarmStartProperties(streams: List<Stream>): Map<String, String> {
-        return generateColdStartProperties(streams) + mapOf("snapshot.mode" to "never")
+        val databaseName = configuration.databaseName
+
+        // Build schema list from streams (similar to old connector)
+        val schemaList = streams.map { it.namespace }.distinct().joinToString(",")
+
+        return DebeziumPropertiesBuilder()
+            .withDefault()
+            .withConnector(SqlServerConnector::class.java)
+            .withDebeziumName(databaseName)
+            .withHeartbeats(configuration.debeziumHeartbeatInterval)
+            .withOffset()
+            .withSchemaHistory() // Include schema history for warm start since it's available from
+            // state
+            .with("include.schema.changes", "false")
+            .with("provide.transaction.metadata", "false")
+            // Use when_needed for warm start (resume from previous position)
+            .with("snapshot.mode", "when_needed")
+            .with("snapshot.isolation.mode", "read_committed")
+            // Schema configuration like old connector
+            .with("schema.include.list", schemaList)
+            .withDatabase("hostname", configuration.realHost)
+            .withDatabase("port", configuration.realPort.toString())
+            .withDatabase("user", configuration.jdbcProperties["user"].toString())
+            .withDatabase("password", configuration.jdbcProperties["password"].toString())
+            .withDatabase("dbname", databaseName)
+            .withDatabase("names", databaseName)
+            // Replicate old connector's SSL property names
+            .with("database.encrypt", configuration.jdbcProperties["encrypt"] ?: "false")
+            .with(
+                "driver.trustServerCertificate",
+                configuration.jdbcProperties["trustServerCertificate"] ?: "true"
+            )
+            // Register the MSSQL custom converter
+            .with("converters", "mssql_converter")
+            .with("mssql_converter.type", MsSqlServerDebeziumConverter::class.java.name)
+            .buildMap()
     }
 
     override fun findStreamName(key: DebeziumRecordKey, value: DebeziumRecordValue): String? {
