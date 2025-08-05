@@ -3,7 +3,8 @@
 # You can't just `source lib/util.sh`, because the current working directory probably isn't `poe-tasks`.
 
 CONNECTORS_DIR="airbyte-integrations/connectors"
-DOCS_BASE_DIR="docs/integrations"
+DOCS_ROOT="docs"
+DOCS_BASE_DIR="$DOCS_ROOT/integrations"
 METADATA_SERVICE_PATH='airbyte-ci/connectors/metadata_service/lib'
 
 # Usage: connector_docs_path "source-foo"
