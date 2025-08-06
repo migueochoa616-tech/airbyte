@@ -9,8 +9,8 @@ source "${BASH_SOURCE%/*}/lib/util.sh"
 source "${BASH_SOURCE%/*}/lib/parse_args.sh"
 connector=$(get_only_connector)
 
-spec_cache_bucket="io-airbyte-cloud-spec-cache"
-metadata_bucket="prod-airbyte-cloud-connector-metadata-service"
+spec_cache_bucket="ab-test-dagger-drop-spec-cache"
+metadata_bucket="ab-test-dagger-drop-metadata-service"
 
 syft_docker_image="anchore/syft:v1.6.0"
 sbom_extension="spdx.json"
