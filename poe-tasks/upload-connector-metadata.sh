@@ -3,11 +3,29 @@ set -euo pipefail
 
 # Uploads the metadata (+SBOM+spec cache) to GCS.
 # Usage: ./poe-tasks/upload-connector-metadata.sh --name destination-bigquery [--pre-release] [--main-release]
+# You must have three environment variables set (GCS_CREDENTIALS, METADATA_SERVICE_GCS_CREDENTIALS, SPEC_CACHE_GCS_CREDENTIALS),
+# each containing a JSON-formatted GCP service account key.
+# SPEC_CACHE_GCS_CREDENTIALS needs write access to `gs://$spec_cache_bucket/specs`.
+# METADATA_SERVICE_GCS_CREDENTIALS needs write access to `gs://$metadata_bucket/sbom`.
+# GCS_CREDENTIALS needs write access to `gs://$metadata_bucket/metadata`.
 
 source "${BASH_SOURCE%/*}/lib/util.sh"
 
 source "${BASH_SOURCE%/*}/lib/parse_args.sh"
 connector=$(get_only_connector)
+
+if ! test "$SPEC_CACHE_GCS_CREDENTIALS"; then
+  echo "SPEC_CACHE_GCS_CREDENTIALS environment variable must be set" >&2
+  exit 1
+fi
+if ! test "$METADATA_SERVICE_GCS_CREDENTIALS"; then
+  echo "METADATA_SERVICE_GCS_CREDENTIALS environment variable must be set" >&2
+  exit 1
+fi
+if ! test "$GCS_CREDENTIALS"; then
+  echo "GCS_CREDENTIALS environment variable must be set" >&2
+  exit 1
+fi
 
 spec_cache_bucket="ab-test-dagger-drop-spec-cache"
 metadata_bucket="ab-test-dagger-drop-metadata-service"
@@ -66,6 +84,7 @@ run_connector_spec OSS spec.json
 echo 'Running spec for CLOUD...'
 run_connector_spec CLOUD spec.cloud.json
 spec_cache_base_path="gs://$spec_cache_bucket/specs/$docker_repository/$docker_tag"
+gcloud_activate_service_account "$SPEC_CACHE_GCS_CREDENTIALS"
 gsutil cp spec.json "$spec_cache_base_path/spec.json"
 # Only upload spec.cloud.json if it's different from spec.json.
 # somewhat confusingly - `diff` returns true if the files are _identical_, so we need `! diff`.
@@ -84,6 +103,7 @@ docker run \
   "$syft_docker_image" \
   -o spdx-json \
   "$full_docker_image" > "$sbom_extension"
+gcloud_activate_service_account "$METADATA_SERVICE_GCS_CREDENTIALS"
 gsutil cp "$sbom_extension" "gs://$metadata_bucket/sbom/$docker_repository/$docker_tag.$sbom_extension"
 
 # Upload the metadata
@@ -94,4 +114,5 @@ else
   # yes, it's --prerelease and not --pre-release
   metadata_upload_prerelease_flag="--prerelease $docker_tag"
 fi
+# Under the hood, this reads the GCS_CREDENTIALS environment variable
 poetry run --directory $METADATA_SERVICE_PATH metadata_service upload "$meta" "$DOCS_ROOT/" "$metadata_bucket" $metadata_upload_prerelease_flag

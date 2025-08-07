@@ -51,3 +51,15 @@ generate_dev_tag() {
   hash=$(git rev-parse --short=10 HEAD)
   echo "${base}-dev.${hash}"
 }
+
+# Authenticate to gcloud using the contents of a variable.
+# That variable should contain a JSON-formatted GCP service account key.
+gcloud_activate_service_account() {
+  touch /tmp/gcloud_creds.json
+  # revoke access to this file from group/other (`go=` means "for Group/Other, set permissions to nothing")
+  # (i.e. only the current user can interact with it)
+  chmod go= /tmp/gcloud_creds.json
+  # echo -E prevents echo from rendering \n into actual newlines.
+  echo -E "$1" > /tmp/gcloud_creds.json
+  gcloud auth activate-service-account --key-file /tmp/gcloud_creds.json
+}
