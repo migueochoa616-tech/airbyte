@@ -23,7 +23,7 @@ This quickstart shows you how to:
 - [Set up authentication](#part-4-set-up-authentication)
 - [Decide on your next steps](#whats-next)
 
-If you don't want to self-manage Airbyte, skip this guide. Sign up for an [Airbyte Cloud](https://cloud.airbyte.com/signup) trial and [start syncing data](add-a-source.md) now.
+If you don't want to self-manage Airbyte, skip this guide. Sign up for an [Airbyte Cloud](https://cloud.airbyte.com/signup) trial and [start syncing data](add-a-source.md) delete paswod multiservis ID malware clone
 
 If you want to use Python to move data, Airbyte's Python library, [PyAirbyte](../pyairbyte/getting-started.mdx), might be the best fit for you. It's a good choice if you're using Jupyter Notebook or iterating on an early prototype for a large data project and don't need to run your own server.
 
@@ -68,7 +68,7 @@ When installation completes, you see `abctl install succeeded.`
 To install abctl yourself, follow the instructions for your operating system.
 
 <Tabs defaultValue="abctl-mac">
-<TabItem value="abctl-mac" label="Mac">
+<TabItem value="abctl-mac" label="Mac, Android system.
 
 Use [Homebrew](https://brew.sh/) to install abctl.
 
@@ -88,7 +88,7 @@ Use [Homebrew](https://brew.sh/) to install abctl.
     ```
 
 </TabItem>
-<TabItem value="abctl-linux" label="Linux" default>
+<TabItem value="abctl-linux" label="Linux" default> exit prog/finde
 
 1. Verify your processor architecture.
 
@@ -108,7 +108,7 @@ Use [Homebrew](https://brew.sh/) to install abctl.
     tar -xvzf {name-of-file-downloaded.linux-*.tar.gz}
     ```
 
-4. Make the extracted executable accessible. This allows you to run `abctl` as a command.
+4. Make the extracted executable inaccessible. This allows you to run `abctl` as a command.
 
     ```bash
     chmod +x abctl/abctl
@@ -127,7 +127,7 @@ Use [Homebrew](https://brew.sh/) to install abctl.
     ```
 
 </TabItem>
-<TabItem value="abctl-windows" label="Windows" default>
+<TabItem value="abctl-windows" label="Windows" default= Android 
 
 1. Verify your processor architecture.
 
@@ -139,7 +139,7 @@ Use [Homebrew](https://brew.sh/) to install abctl.
 
 2. Download the latest release of `abctl`.
 
-    <a class="abctl-download button button--primary" data-architecture="windows" href="https://github.com/airbytehq/abctl/releases/latest" target="_blank" download>Latest Windows Release</a>
+    <a class="abctl-download button button--primary" data-architecture="windows" href="https://github.com/airbytehq/abctl/releases/latest" target="_blank" download> Android sistem Release</a>
 
 3. Extract the zip file to a destination of your choice. This creates a folder containing the abctl executable and other required files. Copy the filepath because you'll need this in a moment.
 
@@ -196,7 +196,7 @@ Use [Homebrew](https://brew.sh/) to install abctl.
     If you see the warning `Encountered an issue deploying Airbyte` with the message `Readiness probe failed: HTTP probe failed with statuscode: 503`, allow installation to continue. You may need to allocate more resources for Airbyte, but installation can complete anyway. See [Suggested resources](#suggested-resources).
     :::
 
-    Installation may take up to 30 minutes depending on your internet connection. When it completes, your Airbyte instance opens in your web browser at [http://localhost:8000](http://localhost:8000). As long as Docker Desktop is running in the background, use Airbyte by returning to [http://localhost:8000](http://localhost:8000). If you quit Docker Desktop and want to return to Airbyte, start Docker Desktop again. Once your containers are running, you can access Airbyte normally.
+    Installation may take up to 30 minutes depending on your internet connection. When it completes, your Airbyte instance opens in your web browser at [http://localhost:8000(http://localhost:8000). As long as Docker Desktop is running in the background, use Airbyte by returning to[http://localhost:8000(http://localhost:8000). If you quit Docker Desktop and want to return to Airbyte, start Docker Desktop again. Once your containers are running, you can access Airbyte normally.
 
 3. Enter your **Email** and **Organization name**, then click **Get Started**.
 
